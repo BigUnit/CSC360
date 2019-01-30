@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <signal.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
@@ -6,8 +7,10 @@
 #include <stdlib.h>
 int setenv(const char *var_name, const char *new_value,int change_flag);
 int unsetenv(const char *var_name);
-//int chdir();
 
+void handle_sigint(int sig){
+    signal(SIGINT,handle_sigint);
+}
 
 #define INPUT_BUFFER 512
 #define TOK_BUFFER 69
@@ -17,11 +20,11 @@ int unsetenv(const char *var_name);
 
  char *built_in[] = {"cd","setenv","unsetenv","exit"};
 
-
-int shell_launcher(char **args){
+//branch for execvp()
+int shell_launcher(char **args){ 
     
     pid_t p_id;
-    //int status;
+    
 
     p_id = fork();
 
@@ -45,7 +48,7 @@ int shell_cd(char **args){
         if(chdir(args[1])){
             fprintf(stderr,"kapish: invalid path for cd \n");
         }
-    } else {fprintf(stderr,"kapish: need argument for cd \n");}
+    } else {chdir(getenv("HOME"));}
 
     return 1;
 }
@@ -194,8 +197,7 @@ void shell_loop(void){
     int status;
 
     do{
-
-    printf("? ");
+    printf("\n? ");
     line = read_line();
     args = tokenize(line);
     status = execute(args);
@@ -209,6 +211,8 @@ void shell_loop(void){
 
 
 int main(){
+
+    signal(SIGINT,handle_sigint); //handles control-c
 
     shell_loop();
 
