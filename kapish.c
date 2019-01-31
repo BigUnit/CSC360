@@ -30,14 +30,12 @@ int shell_launcher(char **args){
 
     if(p_id == 0){
         execvp(args[0],args);
-        fprintf(stderr,"kapish: Invalid Command \n");
+        fprintf(stderr,"kapish: Invalid command ");
         exit(EXIT_FAILURE);
     } else if (p_id < 0) {
-        fprintf(stderr,"kapish: fork error \n");
+        fprintf(stderr,"kapish: fork error ");
     } else {
-       //do{
             wait(NULL);
-        //}while(!WIFEXITED(status) && !WIFSIGNALED(status));
     }
 
     return 1;
@@ -46,7 +44,7 @@ int shell_launcher(char **args){
 int shell_cd(char **args){
     if(args[1]!=NULL){
         if(chdir(args[1])){
-            fprintf(stderr,"kapish: invalid path for cd \n");
+            fprintf(stderr,"kapish: invalid path for cd ");
         }
     } else {chdir(getenv("HOME"));}
 
@@ -56,13 +54,17 @@ int shell_cd(char **args){
 int shell_setenv(char **args){ 
     if(args[1]!=NULL){
 
+
+        if(args[2]==NULL){
+            setenv(args[1],"", 1);
+            return 1;
+            }
+
         if( setenv(args[1], args[2], 1) ){
-            fprintf(stderr,"kapish: invalid argument for setenv \n");
+            fprintf(stderr,"kapish: invalid argument for setenv");
         }
 
-        getenv(args[1]);
-
-    } else{fprintf(stderr,"kapish: argument needed for setenv \n");}
+    } else{fprintf(stderr,"kapish: argument needed for setenv");}
 
     return 1;
 }
@@ -71,15 +73,15 @@ int shell_unsetenv(char **args){
     if(args[1]!=NULL){
           
           if(unsetenv(args[1]) != 0){
-            fprintf(stderr,"kapish: invalid argument for unsetenv \n");
+            fprintf(stderr,"kapish: invalid argument for unsetenv");
         }
-    } else {fprintf(stderr,"kapish: argument needed for unsetenv \n");}
+    } else {fprintf(stderr,"kapish: argument needed for unsetenv");}
 
     return 1;
 }
 
-int shell_exit(){
-    return 0;
+int shell_exit(void){
+    exit(0);
 }
 
 char *read_line(void){
@@ -90,13 +92,19 @@ char *read_line(void){
     int c;
 
     if(!buf){
-        fprintf(stderr, "kapish: allocation error\n");
+        fprintf(stderr, "kapish: allocation error");
         exit(EXIT_FAILURE);
     }
 
 
     while(1){
         c=getchar();
+
+        if(c == EOF && pos == 0){
+            printf("\n");
+            exit(0);
+        }
+
 
         if(c == EOF || c == '\n' ){
             buf[pos] = '\0';
@@ -112,7 +120,7 @@ char *read_line(void){
             buf = realloc(buf,buffer_size*sizeof(char));
 
             if(!buf){
-            fprintf(stderr, "kapish: allocation error\n");
+            fprintf(stderr, "kapish: allocation error");
             exit(EXIT_FAILURE);
             }
         }
@@ -126,8 +134,9 @@ char **tokenize(char *input){
     char **toks = malloc(sizeof(char) * buffer_size);
     char *tok;
 
+
     if(!toks){
-        fprintf(stderr, "kapish: allocation error\n");
+        fprintf(stderr, "kapish: allocation error");
         exit(EXIT_FAILURE);
     }
 
@@ -142,7 +151,7 @@ char **tokenize(char *input){
             toks = realloc(toks,buffer_size * sizeof(char));
 
             if(!toks){
-            fprintf(stderr, "kapish: allocation error\n");
+            fprintf(stderr, "kapish: allocation error");
             exit(EXIT_FAILURE);
             }
 
