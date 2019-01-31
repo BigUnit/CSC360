@@ -100,10 +100,11 @@ char *read_line(void){
     while(1){
         c=getchar();
 
-        if(c == EOF && pos == 0){
-            printf("\n");
-            exit(0);
-        }
+       if(c == EOF && pos == 0){
+                free(buf);
+                printf("\n");
+                exit(0);
+            }
 
 
         if(c == EOF || c == '\n' ){
@@ -133,7 +134,6 @@ char **tokenize(char *input){
     int pos = 0;
     char **toks = malloc(sizeof(char) * buffer_size);
     char *tok;
-
 
     if(!toks){
         fprintf(stderr, "kapish: allocation error");
@@ -218,11 +218,36 @@ void shell_loop(void){
 
 }
 
+void rc_file_read(){
+    char *path = malloc(sizeof(char) * INPUT_BUFFER);
+    strcpy(path,getenv("HOME"));
+    strcat(path,"/.kapishrc");
+
+    FILE *rc = fopen(path,"r");
+    
+
+    if(rc == NULL){
+        fprintf(stderr,"Error with .kapishrc and %s",path);
+        free(path);
+        return;
+    }
+
+    char* line = malloc(sizeof(char) * INPUT_BUFFER);
+    while(fgets(line,INPUT_BUFFER,rc)){
+        execute(tokenize(line));
+    }
+
+    free(path);
+    free(line);
+    fclose(rc);
+}
 
 int main(){
 
     signal(SIGINT,handle_sigint); //handles control-c
-
+    
+    rc_file_read();
+    
     shell_loop();
 
     return EXIT_SUCCESS;

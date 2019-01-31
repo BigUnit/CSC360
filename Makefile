@@ -1,7 +1,10 @@
 CC=gcc
 
 kapish : kapish.o 
-	$(CC) -Wall -Werror kapish.c -o  kapish
+	$(CC)  kapish.o -o  kapish
+
+kapish.o : kapish.c
+	$(CC) -c -std=c11 -Wall -Werror kapish.c -o  kapish.o
 
 clean: 
 	-rm kapish kapish.o
