@@ -1,8 +1,14 @@
+/* Nathan Marcotte
+ * CSC 360 Spring 2019
+ * V00876934
+ * pc_sem_pthread.c
+ */
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
-#include "uthread.h"
-#include "uthread_sem.h"
+#include <pthread.h>
+#include <semaphore.h>
 
 #define MAX_ITEMS 10
 const int NUM_ITERATIONS = 200;
@@ -12,24 +18,24 @@ const int NUM_PRODUCERS  = 2;
 int histogram [MAX_ITEMS+1]; // histogram [i] == # of times list stored i items
 int items = 0;
 
-uthread_sem_t lock;
-uthread_sem_t can_prod;
-uthread_sem_t can_cons;
+sem_t lock;
+sem_t can_prod;
+sem_t can_cons;
 
 void* producer (void* v) {
   for (int i=0; i<NUM_ITERATIONS; i++) {
     // TODO
-    uthread_sem_wait(can_prod);
+    sem_wait(&can_prod);
     
-        uthread_sem_wait(lock);
+        sem_wait(&lock);
 
             items++;
             histogram[items]++;
             assert(items<=MAX_ITEMS);
 
-        uthread_sem_signal(lock);
+        sem_post(&lock);
     
-    uthread_sem_signal(can_cons);
+    sem_post(&can_cons);
   }
   return NULL;
 }
@@ -37,41 +43,41 @@ void* producer (void* v) {
 void* consumer (void* v) {
   for (int i=0; i<NUM_ITERATIONS; i++) {
     // TODO
-     uthread_sem_wait(can_cons);
+     sem_wait(&can_cons);
     
-        uthread_sem_wait(lock);
+        sem_wait(&lock);
 
           items--;
           histogram[items]++;
           assert(items>=0);
 
-        uthread_sem_signal(lock);
+        sem_post(&lock);
     
-    uthread_sem_signal(can_prod);
+    sem_post(&can_prod);
   }
   return NULL;
 }
 
 int main (int argc, char** argv) {
-  uthread_t t[4];
-  uthread_init (4);
+  pthread_t t[4];
 
-lock = uthread_sem_create(1);
-can_prod = uthread_sem_create(MAX_ITEMS);
-can_cons = uthread_sem_create(0);
+
+sem_init(&lock,0,1);
+sem_init(&can_prod,0,MAX_ITEMS);
+sem_init(&can_cons,0,0);
 
 
 for(int i = 0;i<NUM_PRODUCERS;i++){
-  t[i]=uthread_create(producer,NULL);
+  pthread_create(&t[i],NULL,producer,NULL);
 }
 
 for(int i = NUM_PRODUCERS;i<NUM_PRODUCERS+NUM_CONSUMERS;i++){
-  t[i]=uthread_create(consumer,NULL);
+  pthread_create(&t[i],NULL,consumer,NULL);
 }
 
   
 for(int i = 0;i<NUM_PRODUCERS+NUM_CONSUMERS;i++){
-  uthread_join(t[i],0);
+  pthread_join(t[i],0);
 }
  
   // TODO: Create Threads and Join
@@ -82,5 +88,5 @@ for(int i = 0;i<NUM_PRODUCERS+NUM_CONSUMERS;i++){
     printf ("  items=%d, %d times\n", i, histogram [i]);
     sum += histogram [i];
   }
-  assert (sum == sizeof (t) / sizeof (uthread_t) * NUM_ITERATIONS);
+  assert (sum == sizeof (t) / sizeof (pthread_t) * NUM_ITERATIONS);
 }

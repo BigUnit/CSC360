@@ -1,3 +1,9 @@
+/* Nathan Marcotte
+ * CSC 360 Spring 2019
+ * V00876934
+ * pc_spinlock_uthread.c
+ */
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
@@ -15,6 +21,8 @@ int consumer_wait_count;     // # of times consumer had to wait
 int histogram [MAX_ITEMS+1]; // histogram [i] == # of times list stored i items
 
 spinlock_t lock;
+spinlock_t prod_lock;
+spinlock_t cons_lock;
 int items = 0;
 
 void* producer (void* v) {
@@ -22,9 +30,9 @@ void* producer (void* v) {
     while(1){
 
       while(items>=MAX_ITEMS){
-        spinlock_lock(&lock);
+        spinlock_lock(&prod_lock);
         producer_wait_count++;
-        spinlock_unlock(&lock);
+        spinlock_unlock(&prod_lock);
       }
 
       spinlock_lock(&lock);
@@ -52,9 +60,9 @@ void* consumer (void* v) {
        while(1){
 
       while(items<=0){
-        spinlock_lock(&lock);
+        spinlock_lock(&cons_lock);
         consumer_wait_count++;
-        spinlock_unlock(&lock);
+        spinlock_unlock(&cons_lock);
       }
 
       spinlock_lock(&lock);
@@ -80,6 +88,8 @@ int main (int argc, char** argv) {
   uthread_t t[4];
   uthread_init (4);
   spinlock_create(&lock);
+  spinlock_create(&prod_lock);
+  spinlock_create(&cons_lock);
   // TODO: Create Threads and Join
 
 for(int i = 0;i<NUM_PRODUCERS;i++){

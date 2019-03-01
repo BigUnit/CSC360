@@ -1,3 +1,9 @@
+/* Nathan Marcotte
+ * CSC 360 Spring 2019
+ * V00876934
+ * smoke_uthread.c
+ */
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
@@ -113,7 +119,7 @@ void* get_smoker(int value){
   }
 }
 
-void* handle_bac(void* agent){
+void* handle_bac(void* agent){ //listens to tobacco requests
   struct Agent* ag = agent;
   
   uthread_mutex_lock(ag->mutex);
@@ -127,7 +133,7 @@ void* handle_bac(void* agent){
   uthread_mutex_unlock(ag->mutex);
 
 }
-void* handle_pap(void* agent){
+void* handle_pap(void* agent){ //listens to paper requests
     struct Agent* ag = agent;
   
   uthread_mutex_lock(ag->mutex);
@@ -140,7 +146,7 @@ void* handle_pap(void* agent){
 
   uthread_mutex_unlock(ag->mutex);
 }
-void* handle_mat(void* agent){
+void* handle_mat(void* agent){ //listens to match requests
     struct Agent* ag = agent;
   
   uthread_mutex_lock(ag->mutex);

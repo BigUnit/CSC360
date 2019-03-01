@@ -1,3 +1,9 @@
+/* Nathan Marcotte
+ * CSC 360 Spring 2019
+ * V00876934
+ * pc_mutex_cond_uthread.c
+ */
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
@@ -31,12 +37,9 @@ void* producer (void* v) {
         uthread_cond_wait(none);
       }
 
-      
-    assert(items<=MAX_ITEMS);
-      
-
     items++;
     histogram[items]++;
+    assert(items<=MAX_ITEMS);
     
     uthread_cond_signal(max);
     uthread_mutex_unlock(mutex);
@@ -54,9 +57,9 @@ void* consumer (void* v) {
         uthread_cond_wait(max);
       }
    
-      assert(items>=0);
       items--;
       histogram[items]++;
+      assert(items>=0);
    
      uthread_cond_signal(none);
      uthread_mutex_unlock(mutex);

@@ -1,3 +1,9 @@
+/* Nathan Marcotte
+ * CSC 360 Spring 2019
+ * V00876934
+ * pc_sem_uthread.c
+ */
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
@@ -19,17 +25,17 @@ uthread_sem_t can_cons;
 void* producer (void* v) {
   for (int i=0; i<NUM_ITERATIONS; i++) {
     // TODO
-    uthread_sem_wait(can_prod);
+    uthread_sem_wait(can_prod); //wait until it can produce
     
-        uthread_sem_wait(lock);
+        uthread_sem_wait(lock); //lock 
 
             items++;
             histogram[items]++;
             assert(items<=MAX_ITEMS);
 
-        uthread_sem_signal(lock);
+        uthread_sem_signal(lock); // open lock
     
-    uthread_sem_signal(can_cons);
+    uthread_sem_signal(can_cons); // signals that consumer can consume
   }
   return NULL;
 }
@@ -37,17 +43,17 @@ void* producer (void* v) {
 void* consumer (void* v) {
   for (int i=0; i<NUM_ITERATIONS; i++) {
     // TODO
-     uthread_sem_wait(can_cons);
+     uthread_sem_wait(can_cons); // wait until given signal to consume
     
-        uthread_sem_wait(lock);
+        uthread_sem_wait(lock); // lock
 
           items--;
           histogram[items]++;
           assert(items>=0);
 
-        uthread_sem_signal(lock);
+        uthread_sem_signal(lock); // open lock
     
-    uthread_sem_signal(can_prod);
+    uthread_sem_signal(can_prod); // send signal that it can produce
   }
   return NULL;
 }
