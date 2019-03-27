@@ -1,6 +1,6 @@
 #include "File.h"
 
-void init(void){
+void InitLLFS(void){
 
     create_disk();
 
@@ -45,7 +45,6 @@ void init(void){
     free(FBV);
 
 }
-
 
 void close_block(int block){
 
