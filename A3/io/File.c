@@ -128,3 +128,36 @@ int find_block(){
     return block_num;
 }
 
+void close_inode(int block){
+    BYTE_t* buf = (BYTE_t*)calloc(BLOCK_SIZE,sizeof(BYTE_t));
+    
+    read_block(((block/256)+2),buf);
+
+    for(int i = 0;i<2;i++){
+        buf[(block*2)-(512*(block/256) + i)] = 0b11111111;
+    }
+
+    write_block((block/256),buf);
+    free(buf);
+}
+
+int find_inode(){
+    BYTE_t* buf = (BYTE_t*)calloc(BLOCK_SIZE,sizeof(BYTE_t));
+    
+    int i,j;
+
+    for(i = 0;i<2;i++){
+        read_block((2+i),buf);
+     
+        for(j = 0; j < BLOCK_SIZE; j+=2){
+            if(i==0 && j==0){ continue; }
+        
+            if(buf[j] == 0b00000000 && buf[(j+1)] == 0b00000000){
+                return ((256*i) + (j/2));
+            }
+        }
+    }
+
+   
+    free(buf);
+}

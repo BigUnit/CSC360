@@ -1,7 +1,7 @@
 #include "../io/File.h"
 
 int main(){
-    init();
+    InitLLFS();
 /*
     unsigned char* buf = (unsigned char *)calloc(BLOCK_SIZE, sizeof(unsigned char));;
     buf[0] = 'F';
@@ -11,5 +11,8 @@ int main(){
 
     write_block(0,buf);
 */
+
+    printf("%d",find_inode());
+
     return 0;
 }
