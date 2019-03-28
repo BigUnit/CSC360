@@ -37,8 +37,8 @@ void close_inode(int inode_num);
 
 int find_block(void);
 
-//void print_inode(inode_t* inode);
-//void print_buf(BYTE_t* buffer);
+void print_inode(inode_t* inode);
+void print_buf(BYTE_t* buffer);
 void inode_into_buffer(inode_t* inode, BYTE_t* buffer);
 void buffer_into_inode(inode_t* inode, BYTE_t* buffer);
 void dir_into_buffer(dir_t* dir, BYTE_t* buffer);

@@ -220,7 +220,7 @@ void dir_into_buffer(dir_t* dir, BYTE_t* buffer){
         buffer[(i*dir_entry_size)] = dir->entries[i].inode_ID;
         
             for(int j = 1; j<32; j++){
-                buffer[ j+ (i*dir_entry_size) ] = dir->entries[i].filename[j];
+                buffer[ j + (i*dir_entry_size) ] = dir->entries[i].filename[j-1];
             }
     }
 }
@@ -233,17 +233,17 @@ void buffer_into_dir(dir_t* dir, BYTE_t* buffer){
         dir->entries[i].inode_ID = buffer[(i*dir_entry_size)];
 
         for(int j = 1; j<32; j++){
-            dir->entries[i].filename[j] = buffer[ j+ (i*dir_entry_size) ] ;
+            dir->entries[i].filename[j-1] = buffer[ j+ (i*dir_entry_size) ] ;
         }
     }
 
 }
 
 void make_dir (){
-    
+
 }
 
-/*
+
 void print_inode(inode_t* inode){
 
     printf("%" PRIu32 "\n",inode->size);
@@ -287,4 +287,3 @@ void print_buf(BYTE_t* buffer){
 
 } //testing code
 
-*/
