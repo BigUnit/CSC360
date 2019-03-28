@@ -1,6 +1,6 @@
 #include "vdiskAPI.h"
 
-int read_block(int block, unsigned char* buf){
+int read_block(int block, BYTE_t* buf){
    if(block > NUM_BLOCKS || block < 0){return -1;}
    
     FILE* disk = fopen(VDISK,"r");
@@ -14,7 +14,7 @@ int read_block(int block, unsigned char* buf){
 
 }
 
-int write_block(int block, unsigned char* data){
+int write_block(int block, BYTE_t* data){
    if(block > NUM_BLOCKS || block < 0){return -1;}
 
     FILE* disk = fopen(VDISK,"r+");
