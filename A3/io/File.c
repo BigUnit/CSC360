@@ -281,9 +281,9 @@ int get_inode_address(int inode_num){
 
 void make_dir (BYTE_t* path){
 
-    //inode_t* in = (inode_t*)calloc(1,sizeof(inode_t));
-   // BYTE_t* buf = (BYTE_t*)calloc(BLOCK_SIZE,sizeof(BYTE_t));
-   // dir_t*  parent = (dir_t*)calloc(1,sizeof(dir_t));
+    inode_t* in = (inode_t*)calloc(1,sizeof(inode_t));
+    BYTE_t* buf = (BYTE_t*)calloc(BLOCK_SIZE,sizeof(BYTE_t));
+    dir_t*  parent = (dir_t*)calloc(1,sizeof(dir_t));
 
     //printf("\n%d\n", find_block());
 /*
@@ -326,6 +326,7 @@ void make_dir (BYTE_t* path){
 
     BYTE_t* tokens [4];
     int path_len = 0;
+    
   
   while( tok != NULL ) {
      //printf( " %s\n", tok );
@@ -334,10 +335,104 @@ void make_dir (BYTE_t* path){
       //printf( " %s\n", tokens[path_len] );
       tok = strtok(NULL, delim);
    }
+    int parent_dir_block;
+    printf("%d",path_len);
+    int parent_inode_ID;
+    int parent_inode_address;
+    
+    read_block(ROOT_INODE_BLOCK,buf);
+    buffer_into_inode(in,buf);
+    assert(in->flags==1);
+    parent_dir_block = in->blocks[0];
+    read_block(parent_dir_block,buf);
+    buffer_into_dir(parent,buf);
 
-    for(int i=0;i<path_len;i++){
+    
+
+    for(int i = 1;i<path_len-1;i++){ // reads thorugh intermediate directories on path
+        
+        for(int j=2;j<MAX_DIR_ENTRIES;j++){ // first entry in directory is itself, parent is second so we can skip checking those(start at 2)
+            if(!(strncmp(tokens[i],parent->entries[j].filename,FILENAME_LEN))){
+                parent_inode_ID=parent->entries[j].inode_ID;
+                parent_inode_address = get_inode_address(parent_inode_ID);
+
+                read_block(parent_inode_address,buf);
+                buffer_into_inode(in,buf);
+                assert(in->flags==1);
+                parent_dir_block = in->blocks[0];
+                read_block(parent_dir_block,buf);
+                buffer_into_dir(parent,buf);
+                break;
+            }
+   
+        }
+
+    }
+
+
+    inode_t* new_dir_inode = (inode_t*)calloc(1,sizeof(inode_t));
+   //BYTE_t* buf = (BYTE_t*)calloc(BLOCK_SIZE,sizeof(BYTE_t));
+    dir_t*  new_dir = (dir_t*)calloc(1,sizeof(dir_t));
+    
+    
+    int inode_num = find_inode();
+    int inode_block = find_block();
+    close_block(inode_block);
+    close_inode(inode_num, inode_block);
+
+
+    int new_dir_block = find_block();
+    close_block(new_dir_block);
+
+    new_dir_inode->size = 0;
+    new_dir_inode->flags = 1;
+    new_dir_inode->blocks [0] = new_dir_block;
+
+/*
+    BYTE_t* temp_tok = (BYTE_t*)malloc(FILENAME_LEN* sizeof(BYTE_t));
+    
+    strncpy(temp_tok, tokens[path_len], FILENAME_LEN);
+   // strcat(temp_tok,"\0");
+*/ 
+//THIS SHIT BROKE, PRINTS OUT GARBAGE RATHER THAN NAME LIKELY PROBABLY SOMETHING WITH NULL TERMINATOR
+
+    new_dir->entries[0].inode_ID = (uint8_t)inode_num;
+    strncpy(new_dir->entries[0].filename, temp_tok, FILENAME_LEN+1); //first entry is itself
+    new_dir->entries[1].inode_ID = parent->entries[0].inode_ID;
+    strncpy(new_dir->entries[1].filename, parent->entries[0].filename, FILENAME_LEN); // second entry is parent directory
+
+    int dir_opening;
+
+    for(dir_opening=0;dir_opening<MAX_DIR_ENTRIES;dir_opening++){
+        if(!strcmp(parent->entries[dir_opening].filename,"") ){break;};
+    }
+
+    //printf("%d",dir_opening);
+
+    assert(dir_opening<MAX_DIR_ENTRIES);
+
+
+    parent->entries[dir_opening].inode_ID = (uint8_t)inode_num;
+    strncpy(parent->entries[dir_opening].filename, temp_tok , FILENAME_LEN); 
+
+    dir_into_buffer(parent,buf);
+    write_block(parent_dir_block,buf);
+    inode_into_buffer(new_dir_inode,buf);
+    write_block(inode_block,buf);
+    dir_into_buffer(new_dir,buf);
+    write_block(new_dir_block,buf);
+
+    
+    for(int i=0;i<path_len;i++){    
         printf( " %s\n", tokens[i] );
     }
+
+    free(new_dir_inode);
+    free(new_dir);
+    free(in);
+    free(parent);
+    free(buf);
+    free(temp_tok);
 
 }
 

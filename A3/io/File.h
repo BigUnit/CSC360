@@ -8,6 +8,10 @@
 
 #define MAX_INODES 256
 #define MAX_PATH_LEN 128
+#define ROOT_INODE_BLOCK 10
+#define MAX_DIR_ENTRIES 16
+#define FILENAME_LEN 31
+#define ROOT_DIR_BLOCK 11
 
 typedef struct
 {
@@ -22,13 +26,13 @@ typedef struct
 typedef struct
 {
     uint8_t inode_ID;
-    BYTE_t filename [31];
+    BYTE_t filename [FILENAME_LEN];
     
 }dir_entry_t;
 
 typedef struct
 {
-    dir_entry_t entries [16];
+    dir_entry_t entries [MAX_DIR_ENTRIES];
 
 }dir_t;
 
