@@ -4,6 +4,10 @@
 #include "vdiskAPI.h"
 #include <stdint.h>
 #include <inttypes.h>
+#include <string.h>
+
+#define MAX_INODES 256
+#define MAX_PATH_LEN 128
 
 typedef struct
 {
@@ -33,11 +37,14 @@ void InitLLFS(void);
 void close_block(int block);
 void open_block(int block);
 int find_inode(void);
-void close_inode(int inode_num);
+void close_inode(int inode_num, int block_address);
+int get_inode_address(int inode_num);
 
 int find_block(void);
 
 void print_inode(inode_t* inode);
+void make_dir (BYTE_t* path);
+void make_root_dir (void);
 void print_buf(BYTE_t* buffer);
 void inode_into_buffer(inode_t* inode, BYTE_t* buffer);
 void buffer_into_inode(inode_t* inode, BYTE_t* buffer);

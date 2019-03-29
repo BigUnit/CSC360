@@ -24,8 +24,8 @@ void InitLLFS(void){
      
     superblock [8]  = 0x00; 
     superblock [9]  = 0x00; 
-    superblock [10] = 0x02; 
-    superblock [11] = 0x00; //max 512 inodes
+    superblock [10] = 0x01; 
+    superblock [11] = 0x00; //max 256 inodes BEACUSE ONLY 256 UNIQUE INODE ID (uint8_t)
 
   
     write_block(0,superblock);
@@ -43,6 +43,8 @@ void InitLLFS(void){
 
     write_block(1,FBV);
     free(FBV);
+
+    make_root_dir();
 
 }
 
@@ -125,18 +127,30 @@ int find_block(){
     return block_num;
 }
 
-void close_inode(int inode_num){
+void close_inode(int inode_num, int block_address){
+    assert(!(inode_num<0 || inode_num >= MAX_INODES));
+    assert(!(block_address<0 || block_address >= NUM_BLOCKS));
+    
+    
     BYTE_t* buf = (BYTE_t*)calloc(BLOCK_SIZE,sizeof(BYTE_t));
     
+    BYTE_t first = (block_address & 0xFF00) >> 8;
+    BYTE_t second = (block_address & 0x00FF);
+
+    //printf("\n*%u ** %u *\n",first,second);
+
     read_block(((inode_num/256)+2),buf);
 
-    for(int i = 0;i<2;i++){
-        buf[(inode_num*2)-(512*(inode_num/256) + i)] = 0b11111111;
-    }
+    //for(int i = 0;i<2;i++){
+        buf[(inode_num*2)-(512*(inode_num/256))] = first;
+        buf[(inode_num*2)-(512*(inode_num/256) + 1)] = second;
+    //}
 
     write_block((inode_num/256)+2,buf);
     free(buf);
 }
+
+
 
 int find_inode(){
     BYTE_t* buf = (BYTE_t*)calloc(BLOCK_SIZE,sizeof(BYTE_t));
@@ -239,10 +253,136 @@ void buffer_into_dir(dir_t* dir, BYTE_t* buffer){
 
 }
 
-void make_dir (){
+int get_inode_address(int inode_num){
+    if(inode_num<0 || inode_num >= NUM_BLOCKS){return -1;}
+    
+    BYTE_t* buf = (BYTE_t*)calloc(BLOCK_SIZE,sizeof(BYTE_t));
+    
+    BYTE_t first ;
+    BYTE_t second ;
+
+    
+
+    read_block(((inode_num/256)+2),buf);
+
+    //for(int i = 0;i<2;i++){
+        first = buf[(inode_num*2)-(512*(inode_num/256))] ;
+        second = buf[(inode_num*2)-(512*(inode_num/256) + 1)];
+    //}
+
+    //write_block((inode_num/256)+2,buf);
+    free(buf);
+
+    int address = (first<<8) | (second) ;
+    //printf("\n* %d *\n",address);
+    return address;
 
 }
 
+void make_dir (BYTE_t* path){
+
+    //inode_t* in = (inode_t*)calloc(1,sizeof(inode_t));
+   // BYTE_t* buf = (BYTE_t*)calloc(BLOCK_SIZE,sizeof(BYTE_t));
+   // dir_t*  parent = (dir_t*)calloc(1,sizeof(dir_t));
+
+    //printf("\n%d\n", find_block());
+/*
+    int inode_num = find_inode();
+    int inode_block = find_block();
+    close_block(inode_block);
+    close_inode(inode_num, inode_block);
+    
+    int dir_block = find_block();
+    close_block(dir_block);
+    
+    
+    in->size = 0;
+    in->flags = 1;
+    in->blocks [0] = dir_block;
+    in->blocks [1] = dir_block; // root points to self
+
+
+    dir->entries[0].inode_ID = inode_num;
+    dir->entries[0].filename[0] = '~';
+    dir->entries[0].filename[1] = '\0';
+
+
+
+
+    inode_into_buffer(in,buf);
+    write_block(inode_block,buf);
+    dir_into_buffer(dir,buf);
+    write_block(dir_block,buf);
+
+*/
+    BYTE_t new_path [MAX_PATH_LEN];
+
+    strncpy(new_path,path,MAX_PATH_LEN);
+
+    BYTE_t* tok;
+    const char* delim = "/"; 
+
+    tok = strtok(new_path,delim);
+
+    BYTE_t* tokens [4];
+    int path_len = 0;
+  
+  while( tok != NULL ) {
+     //printf( " %s\n", tok );
+      tokens[path_len] = tok; 
+      path_len++;
+      //printf( " %s\n", tokens[path_len] );
+      tok = strtok(NULL, delim);
+   }
+
+    for(int i=0;i<path_len;i++){
+        printf( " %s\n", tokens[i] );
+    }
+
+}
+
+void make_root_dir (){
+    inode_t* in = (inode_t*)calloc(1,sizeof(inode_t));
+    BYTE_t* buf = (BYTE_t*)calloc(BLOCK_SIZE,sizeof(BYTE_t));
+    dir_t*  root = (dir_t*)calloc(1,sizeof(dir_t));
+
+    //printf("\n%d\n", find_block());
+
+    int inode_num = find_inode();
+    int inode_block = find_block();
+    close_block(inode_block);
+    close_inode(inode_num, inode_block);
+    //get_inode_address(inode_num);
+    
+    //printf("\n%d\n", find_inode());
+    //printf("\n%d\n", get_inode_address(inode_num));
+    
+    int root_block = find_block();
+    close_block(root_block);
+    
+    
+    
+    in->size = 0;
+    in->flags = 1;
+    in->blocks [0] = root_block;
+
+
+    root->entries[0].inode_ID = (uint8_t)inode_num;
+    root->entries[0].filename[0] = '~';
+    root->entries[0].filename[1] = '\0';
+    root->entries[1].inode_ID = root->entries[0].inode_ID;
+    strncpy(root->entries[1].filename,root->entries[0].filename,31); //  root's parent directory is itself, 31 is max filename len
+
+    inode_into_buffer(in,buf);
+    write_block(inode_block,buf);
+    dir_into_buffer(root,buf);
+    write_block(root_block,buf);
+
+    free(in);
+    free(root);
+    free(buf);
+    
+}
 
 void print_inode(inode_t* inode){
 
