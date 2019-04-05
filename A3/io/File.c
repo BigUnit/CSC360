@@ -8,8 +8,6 @@ void InitLLFS(void){
     
     for(int i=0;i<NUM_BLOCKS;i++){ write_block(i,buffer); } //set everything to 0;
 
-    free(buffer);
-
     BYTE_t* superblock = (BYTE_t *)calloc(BLOCK_SIZE, sizeof(BYTE_t));
 
     superblock [0]  = 0x53;
@@ -30,7 +28,7 @@ void InitLLFS(void){
   
     write_block(0,superblock);
 
-    free(superblock);
+    
     
 
     BYTE_t* FBV = (BYTE_t *)calloc(BLOCK_SIZE, sizeof(BYTE_t));
@@ -42,7 +40,10 @@ void InitLLFS(void){
     }
 
     write_block(1,FBV);
+    
     free(FBV);
+    free(buffer);
+    free(superblock);
 
     make_root_dir();
 
@@ -139,18 +140,36 @@ void close_inode(int inode_num, int block_address){
 
     //printf("\n*%u ** %u *\n",first,second);
 
-    read_block(((inode_num/256)+2),buf);
+    read_block(2,buf);
 
     //for(int i = 0;i<2;i++){
-        buf[(inode_num*2)-(512*(inode_num/256))] = first;
-        buf[(inode_num*2)-(512*(inode_num/256) + 1)] = second;
+        buf[(inode_num*2)] = first;
+        buf[(inode_num*2)+1] = second;
     //}
 
-    write_block((inode_num/256)+2,buf);
+    write_block(2,buf);
     free(buf);
 }
 
+void open_inode(int inode_num){
+    assert(!(inode_num<0 || inode_num >= MAX_INODES));
+    
+    
+    BYTE_t* buf = (BYTE_t*)calloc(BLOCK_SIZE,sizeof(BYTE_t));
 
+
+    //printf("\n*%u ** %u *\n",first,second);
+
+    read_block(2,buf);
+
+    //for(int i = 0;i<2;i++){
+        buf[(inode_num*2)] = 0x00;
+        buf[(inode_num*2)+1] = 0x00;
+    //}
+
+    write_block(2,buf);
+    free(buf);
+}
 
 int find_inode(){
     BYTE_t* buf = (BYTE_t*)calloc(BLOCK_SIZE,sizeof(BYTE_t));
@@ -162,7 +181,7 @@ int find_inode(){
      
         for(j = 0; j < BLOCK_SIZE; j+=2){
             if(i==0 && j==0){ continue; }
-            if(buf[j] == 0b00000000 && buf[(j+1)] == 0b00000000){ return ((256*i) + (j/2)); }
+            if(buf[j] == 0x00 && buf[(j+1)] == 0x00){ return ((256*i) + (j/2)); }
         }
     }
 
@@ -198,11 +217,7 @@ void inode_into_buffer(inode_t* inode, BYTE_t* buffer){
     for(int i = 32; i<BLOCK_SIZE; i++){
         buffer[i] = 0x00000000;
     }
-/*
-    print_inode(inode);
-    printf("****\n");
-    print_buf(buffer);
-*/
+
 
 }
 
@@ -218,11 +233,7 @@ void buffer_into_inode(inode_t* inode, BYTE_t* buffer){
     inode->single_ind = ( ( buffer[28]<< 8 ) | (buffer[29]) );
     inode->double_ind = ( ( buffer[30]<< 8 ) | (buffer[31]) );
 
-/*
-    print_buf(buffer);
-    printf("****\n");
-    print_inode(inode);
-  */  
+
 
 }
 
@@ -263,58 +274,28 @@ int get_inode_address(int inode_num){
 
     
 
-    read_block(((inode_num/256)+2),buf);
+    read_block(2,buf);
 
     //for(int i = 0;i<2;i++){
-        first = buf[(inode_num*2)-(512*(inode_num/256))] ;
-        second = buf[(inode_num*2)-(512*(inode_num/256) + 1)];
+        first = buf[(inode_num*2)] ;
+        second = buf[(inode_num*2)+ 1];
     //}
 
     //write_block((inode_num/256)+2,buf);
     free(buf);
 
     int address = (first<<8) | (second) ;
-    //printf("\n* %d *\n",address);
+    printf("\n* %d *\n",address);
     return address;
 
 }
 
-void make_dir (BYTE_t* path){
-
+void remove_dir (BYTE_t* path){
     inode_t* in = (inode_t*)calloc(1,sizeof(inode_t));
     BYTE_t* buf = (BYTE_t*)calloc(BLOCK_SIZE,sizeof(BYTE_t));
     dir_t*  parent = (dir_t*)calloc(1,sizeof(dir_t));
 
-    //printf("\n%d\n", find_block());
-/*
-    int inode_num = find_inode();
-    int inode_block = find_block();
-    close_block(inode_block);
-    close_inode(inode_num, inode_block);
     
-    int dir_block = find_block();
-    close_block(dir_block);
-    
-    
-    in->size = 0;
-    in->flags = 1;
-    in->blocks [0] = dir_block;
-    in->blocks [1] = dir_block; // root points to self
-
-
-    dir->entries[0].inode_ID = inode_num;
-    dir->entries[0].filename[0] = '~';
-    dir->entries[0].filename[1] = '\0';
-
-
-
-
-    inode_into_buffer(in,buf);
-    write_block(inode_block,buf);
-    dir_into_buffer(dir,buf);
-    write_block(dir_block,buf);
-
-*/
     BYTE_t new_path [MAX_PATH_LEN];
 
     strncpy(new_path,path,MAX_PATH_LEN);
@@ -324,26 +305,27 @@ void make_dir (BYTE_t* path){
 
     tok = strtok(new_path,delim);
 
-    BYTE_t* tokens [4];
+    BYTE_t* tokens [4];  // change back to size 4
     int path_len = 0;
     
   
   while( tok != NULL ) {
-     //printf( " %s\n", tok );
+
       tokens[path_len] = tok; 
       path_len++;
-      //printf( " %s\n", tokens[path_len] );
+
       tok = strtok(NULL, delim);
    }
-    int parent_dir_block;
-    printf("%d",path_len);
-    int parent_inode_ID;
-    int parent_inode_address;
+    int parent_dir_block = ROOT_DIR_BLOCK;
+
+    int parent_inode_ID = ROOT_INODE_ID;
+    int parent_inode_address = ROOT_INODE_BLOCK;
     
-    read_block(ROOT_INODE_BLOCK,buf);
+    read_block(parent_inode_address,buf);
     buffer_into_inode(in,buf);
     assert(in->flags==1);
     parent_dir_block = in->blocks[0];
+ 
     read_block(parent_dir_block,buf);
     buffer_into_dir(parent,buf);
 
@@ -356,22 +338,173 @@ void make_dir (BYTE_t* path){
                 parent_inode_ID=parent->entries[j].inode_ID;
                 parent_inode_address = get_inode_address(parent_inode_ID);
 
+
+
+                   // printf("\n inode id: %d inode add: %d \n",parent_inode_ID, parent_inode_address);
+
+     
+
                 read_block(parent_inode_address,buf);
                 buffer_into_inode(in,buf);
                 assert(in->flags==1);
-                parent_dir_block = in->blocks[0];
+                parent_dir_block = in->blocks[0]; 
+       
                 read_block(parent_dir_block,buf);
                 buffer_into_dir(parent,buf);
+
+                printf("\n FRFR CUH : %s\n",parent->entries[0].filename);
+
                 break;
             }
    
         }
-
+            
     }
 
 
+
+    dir_t* rm_dir = (dir_t*)calloc(1,sizeof(dir_t));
+
+    int dir_inode_ID ;
+    int dir_inode_address;
+    int dir_block;
+
+     
+
+    for(int j=2;j<MAX_DIR_ENTRIES;j++){ // first entry in directory is itself, parent is second so we can skip checking those(start at 2)
+            if(!(strncmp(tokens[path_len-1],parent->entries[j].filename,FILENAME_LEN))){
+                dir_inode_ID=parent->entries[j].inode_ID;
+                dir_inode_address = get_inode_address(dir_inode_ID);
+
+
+
+                   // printf("\n inode id: %d inode add: %d \n",parent_inode_ID, parent_inode_address);
+
+                strncpy(parent->entries[j].filename,"",FILENAME_LEN);
+                parent->entries[j].inode_ID = 0;
+
+                read_block(dir_inode_address,buf);
+                buffer_into_inode(in,buf);
+                assert(in->flags==1);
+                dir_block = in->blocks[0]; 
+       
+                read_block(dir_block,buf);
+                buffer_into_dir(rm_dir,buf);
+
+                printf("\n BRUH : %s\n",rm_dir->entries[0].filename);
+
+                break;
+            }
+
+    }
+
+    for(int i = 2; i<MAX_DIR_ENTRIES; i++){   assert(rm_dir->entries[i].inode_ID==0);  } //assert dir has no entries beyong itself and parent 
+
+
+    dir_into_buffer(parent,buf);
+    write_block(parent_dir_block,buf);
+
+
+    BYTE_t* wipe = (BYTE_t*)calloc(BLOCK_SIZE,sizeof(BYTE_t));
+    write_block(dir_inode_address,wipe);
+    write_block(dir_block,wipe);
+
+    open_inode(dir_inode_ID);
+    open_block(dir_inode_address);
+    open_block(dir_block);
+
+    //printf("inode: %d , next block: %d",find_inode(), find_block());
+    //close_block(find_block());
+    //printf("next dir: %d",find_block());
+
+    free(in);
+    free(buf);
+    free(parent);
+    free(wipe);
+    free(rm_dir);
+
+}
+
+void make_dir (BYTE_t* path){
+
+    inode_t* in = (inode_t*)calloc(1,sizeof(inode_t));
+    BYTE_t* buf = (BYTE_t*)calloc(BLOCK_SIZE,sizeof(BYTE_t));
+    dir_t*  parent = (dir_t*)calloc(1,sizeof(dir_t));
+
+    
+    BYTE_t new_path [MAX_PATH_LEN];
+
+    strncpy(new_path,path,MAX_PATH_LEN);
+
+    BYTE_t* tok;
+    const char* delim = "/"; 
+
+    tok = strtok(new_path,delim);
+
+    BYTE_t* tokens [4];  // change back to size 4
+    int path_len = 0;
+    
+  
+  while( tok != NULL ) {
+
+      tokens[path_len] = tok; 
+      path_len++;
+
+      tok = strtok(NULL, delim);
+   }
+    int parent_dir_block = ROOT_DIR_BLOCK;
+
+    int parent_inode_ID = ROOT_INODE_ID;
+    int parent_inode_address = ROOT_INODE_BLOCK;
+    
+    read_block(parent_inode_address,buf);
+    buffer_into_inode(in,buf);
+    assert(in->flags==1);
+    parent_dir_block = in->blocks[0];
+ 
+    read_block(parent_dir_block,buf);
+    buffer_into_dir(parent,buf);
+
+
+
+
+
+    
+
+    for(int i = 1;i<path_len-1;i++){ // reads thorugh intermediate directories on path
+        
+        for(int j=2;j<MAX_DIR_ENTRIES;j++){ // first entry in directory is itself, parent is second so we can skip checking those(start at 2)
+            if(!(strncmp(tokens[i],parent->entries[j].filename,FILENAME_LEN))){
+                parent_inode_ID=parent->entries[j].inode_ID;
+                parent_inode_address = get_inode_address(parent_inode_ID);
+
+
+
+                   // printf("\n inode id: %d inode add: %d \n",parent_inode_ID, parent_inode_address);
+
+     
+
+                read_block(parent_inode_address,buf);
+                buffer_into_inode(in,buf);
+                assert(in->flags==1);
+                parent_dir_block = in->blocks[0]; 
+       
+                read_block(parent_dir_block,buf);
+                buffer_into_dir(parent,buf);
+
+                printf("\n Y ee t : %s\n",parent->entries[0].filename);
+
+                break;
+            }
+   
+        }
+            
+    }
+
+
+    printf("\n%s\n",parent->entries[0].filename);
+
     inode_t* new_dir_inode = (inode_t*)calloc(1,sizeof(inode_t));
-   //BYTE_t* buf = (BYTE_t*)calloc(BLOCK_SIZE,sizeof(BYTE_t));
     dir_t*  new_dir = (dir_t*)calloc(1,sizeof(dir_t));
     
     
@@ -381,58 +514,57 @@ void make_dir (BYTE_t* path){
     close_inode(inode_num, inode_block);
 
 
-    int new_dir_block = find_block();
+
+
+    int new_dir_block = find_block(); 
+    printf("POSSIBLR FUCKING ERROR HERE DKM : %d\n",new_dir_block);
     close_block(new_dir_block);
+
+    printf("* inum: %d * iblock: %d * dirblock: %d *\n",inode_num, inode_block, new_dir_block);
 
     new_dir_inode->size = 0;
     new_dir_inode->flags = 1;
     new_dir_inode->blocks [0] = new_dir_block;
 
-/*
-    BYTE_t* temp_tok = (BYTE_t*)malloc(FILENAME_LEN* sizeof(BYTE_t));
-    
-    strncpy(temp_tok, tokens[path_len], FILENAME_LEN);
-   // strcat(temp_tok,"\0");
-*/ 
-//THIS SHIT BROKE, PRINTS OUT GARBAGE RATHER THAN NAME LIKELY PROBABLY SOMETHING WITH NULL TERMINATOR
+
+
 
     new_dir->entries[0].inode_ID = (uint8_t)inode_num;
-    strncpy(new_dir->entries[0].filename, temp_tok, FILENAME_LEN+1); //first entry is itself
+    strncpy(new_dir->entries[0].filename, tokens[path_len-1], FILENAME_LEN); //first entry is itself
     new_dir->entries[1].inode_ID = parent->entries[0].inode_ID;
     strncpy(new_dir->entries[1].filename, parent->entries[0].filename, FILENAME_LEN); // second entry is parent directory
 
-    int dir_opening;
+    int dir_opening ;
 
-    for(dir_opening=0;dir_opening<MAX_DIR_ENTRIES;dir_opening++){
+    for(dir_opening=2;dir_opening<MAX_DIR_ENTRIES;dir_opening++){
         if(!strcmp(parent->entries[dir_opening].filename,"") ){break;};
     }
 
-    //printf("%d",dir_opening);
 
     assert(dir_opening<MAX_DIR_ENTRIES);
 
 
     parent->entries[dir_opening].inode_ID = (uint8_t)inode_num;
-    strncpy(parent->entries[dir_opening].filename, temp_tok , FILENAME_LEN); 
+    strncpy(parent->entries[dir_opening].filename, tokens[path_len-1] , FILENAME_LEN); 
 
-    dir_into_buffer(parent,buf);
-    write_block(parent_dir_block,buf);
+
     inode_into_buffer(new_dir_inode,buf);
     write_block(inode_block,buf);
+
     dir_into_buffer(new_dir,buf);
     write_block(new_dir_block,buf);
-
     
-    for(int i=0;i<path_len;i++){    
-        printf( " %s\n", tokens[i] );
-    }
+    dir_into_buffer(parent,buf);
+    write_block(parent_dir_block,buf);
+    
+
 
     free(new_dir_inode);
     free(new_dir);
     free(in);
     free(parent);
     free(buf);
-    free(temp_tok);
+
 
 }
 
@@ -466,12 +598,13 @@ void make_root_dir (){
     root->entries[0].filename[0] = '~';
     root->entries[0].filename[1] = '\0';
     root->entries[1].inode_ID = root->entries[0].inode_ID;
-    strncpy(root->entries[1].filename,root->entries[0].filename,31); //  root's parent directory is itself, 31 is max filename len
+    strncpy(root->entries[1].filename,root->entries[0].filename,FILENAME_LEN); //  root's parent directory is itself, 31 is max filename len
 
     inode_into_buffer(in,buf);
     write_block(inode_block,buf);
     dir_into_buffer(root,buf);
     write_block(root_block,buf);
+
 
     free(in);
     free(root);
@@ -522,3 +655,797 @@ void print_buf(BYTE_t* buffer){
 
 } //testing code
 
+
+void write_file(BYTE_t* path, FILE* file){
+    
+
+    inode_t* in = (inode_t*)calloc(1,sizeof(inode_t));
+    BYTE_t* buf = (BYTE_t*)calloc(BLOCK_SIZE,sizeof(BYTE_t));
+    dir_t*  parent = (dir_t*)calloc(1,sizeof(dir_t));
+
+    
+    BYTE_t new_path [MAX_FILE_PATH_LEN];
+
+    strncpy(new_path,path,MAX_FILE_PATH_LEN);
+
+    BYTE_t* tok;
+    const char* delim = "/"; 
+
+    tok = strtok(new_path,delim);
+
+    BYTE_t* tokens [5];  
+    int path_len = 0;
+    
+  
+  while( tok != NULL ) {
+
+      tokens[path_len] = tok; 
+      path_len++;
+
+      tok = strtok(NULL, delim);
+   }
+    int parent_dir_block = ROOT_DIR_BLOCK;
+
+    int parent_inode_ID = ROOT_INODE_ID;
+    int parent_inode_address = ROOT_INODE_BLOCK;
+    
+    read_block(parent_inode_address,buf);
+    buffer_into_inode(in,buf);
+    assert(in->flags==1);
+    parent_dir_block = in->blocks[0];
+ 
+    read_block(parent_dir_block,buf);
+    buffer_into_dir(parent,buf);
+
+
+
+    for(int i = 1;i<path_len-1;i++){ // reads thorugh intermediate directories on path
+        
+        for(int j=2;j<MAX_DIR_ENTRIES;j++){ // first entry in directory is itself, parent is second so we can skip checking those(start at 2)
+            if(!(strncmp(tokens[i],parent->entries[j].filename,FILENAME_LEN))){
+                parent_inode_ID=parent->entries[j].inode_ID;
+                parent_inode_address = get_inode_address(parent_inode_ID);
+
+
+
+                   // printf("\n inode id: %d inode add: %d \n",parent_inode_ID, parent_inode_address);
+
+     
+
+                read_block(parent_inode_address,buf);
+                buffer_into_inode(in,buf);
+                assert(in->flags==1);
+                parent_dir_block = in->blocks[0]; 
+       
+                read_block(parent_dir_block,buf);
+                buffer_into_dir(parent,buf);
+
+                //printf("\n Y ee t : %s\n",parent->entries[0].filename);
+
+                break;
+            }
+   
+        }
+            
+    }
+
+
+    //printf("\n%s\n",parent->entries[0].filename);
+
+
+    int dir_opening ;
+
+    for(dir_opening=2;dir_opening<MAX_DIR_ENTRIES;dir_opening++){
+        if(!strcmp(parent->entries[dir_opening].filename,"") ){break;};
+    }
+
+    assert(dir_opening<MAX_DIR_ENTRIES);
+
+ 
+
+
+
+    fseek(file,0,SEEK_END);
+    int len = ftell(file);
+
+    fseek(file,0,SEEK_SET); // RETURN FP TO START
+    printf("%d\n",len);
+    
+    int full_blocks = len/512;
+    int extra_bytes = len%512;
+    int blocks_needed = full_blocks+(extra_bytes!=0);
+    
+    //printf("%d ||||||||| %d",full_blocks,extra_bytes);
+    printf("\n**%d**\n", blocks_needed);
+    
+    inode_t* file_inode = (inode_t*)calloc(1,sizeof(inode_t));
+    int file_inode_ID = find_inode();
+    int file_inode_block = find_block();
+    close_block(file_inode_block);
+    close_inode(file_inode_ID,file_inode_block);
+
+    file_inode->size = len; //might brick
+    
+    file_inode->flags = 0;
+
+    //printf("\n*\n** %d **\n*\n",blocks_needed);
+    
+    BYTE_t* double_buf = (BYTE_t*)calloc(BLOCK_SIZE,sizeof(BYTE_t));
+    BYTE_t* single_buf = (BYTE_t*)calloc(BLOCK_SIZE,sizeof(BYTE_t)); 
+
+    parent->entries[dir_opening].inode_ID = (uint8_t)file_inode_ID;
+    strncpy(parent->entries[dir_opening].filename, tokens[path_len-1] , FILENAME_LEN); 
+    dir_into_buffer(parent,buf);
+    write_block(parent_dir_block,buf);
+    int block;
+
+    if (blocks_needed<=10) {
+       
+
+        for(int i = 0; i<blocks_needed; i++){
+            block = find_block();
+            close_block(block);
+            file_inode->blocks[i] = block;
+
+            fseek(file,i*BLOCK_SIZE,SEEK_SET);
+            fread(buf,BLOCK_SIZE,1,file);
+
+            if(i == blocks_needed-1 ){   for(int j = extra_bytes; j<BLOCK_SIZE; j++){    buf[j]=0;   }  }
+
+            write_block(block,buf);
+
+
+        }
+    } else if(blocks_needed>10 && blocks_needed<=266){
+       
+        block = find_block();
+        close_block(block);
+
+        file_inode->single_ind = block; 
+
+        int di_blocks_written;
+        int s_blocks_written;
+
+        for(di_blocks_written = 0; di_blocks_written<10; di_blocks_written++){
+            block = find_block();
+            close_block(block);
+            file_inode->blocks[di_blocks_written] = block;
+
+            fseek(file,di_blocks_written*BLOCK_SIZE,SEEK_SET);
+            fread(buf,BLOCK_SIZE,1,file);
+            write_block(block,buf);
+        }
+
+        blocks_needed -= di_blocks_written;
+
+      
+
+        printf("^^^^^%d^^^^^\n",file_inode->single_ind);
+
+        read_block(file_inode->single_ind,single_buf);
+
+        for(s_blocks_written = 0; s_blocks_written<blocks_needed; s_blocks_written++){
+            block = find_block();
+            close_block(block);
+            single_buf[2*s_blocks_written] = (block & 0xFF00) >> 8;
+            single_buf[(2*s_blocks_written)+1] = (block & 0x00FF);
+
+
+            fseek(file,(di_blocks_written+s_blocks_written)*BLOCK_SIZE,SEEK_SET);
+            fread(buf,BLOCK_SIZE,1,file);
+             if(s_blocks_written == blocks_needed-1 && extra_bytes != 0){   for(int j = extra_bytes; j<BLOCK_SIZE; j++){    buf[j]=0;  }   }
+            write_block(block,buf);
+        }
+
+        write_block(file_inode->single_ind,single_buf); 
+        printf("^&^%d\n",file_inode->single_ind);
+            
+
+    }   else if (blocks_needed > 266){ // if need more than 10 direct block and the 256 indirect
+
+
+        printf("&&&&&&&&&&&&&");
+        fflush(stdout);
+
+
+
+        block = find_block();
+        close_block(block);
+        file_inode->double_ind = block; 
+
+        
+        block = find_block();
+        close_block(block);
+
+        file_inode->single_ind = block; 
+
+        int di_blocks_written;
+        int s_blocks_written;
+
+        for(di_blocks_written = 0; di_blocks_written<10; di_blocks_written++){
+            block = find_block();
+            close_block(block);
+            file_inode->blocks[di_blocks_written] = block;
+
+            fseek(file,di_blocks_written*BLOCK_SIZE,SEEK_SET);
+            fread(buf,BLOCK_SIZE,1,file);
+            write_block(block,buf);
+        }
+
+        blocks_needed -= di_blocks_written;
+      
+
+        printf("^^^^^%d^^^^^\n",file_inode->single_ind);
+
+        read_block(file_inode->single_ind,single_buf);
+
+        for(s_blocks_written = 0; s_blocks_written<256; s_blocks_written++){
+            block = find_block();
+            close_block(block);
+            single_buf[2*s_blocks_written] = (block & 0xFF00) >> 8;
+            single_buf[(2*s_blocks_written)+1] = (block & 0x00FF);
+
+
+            fseek(file,(di_blocks_written+s_blocks_written)*BLOCK_SIZE,SEEK_SET);
+            fread(buf,BLOCK_SIZE,1,file);
+             if(s_blocks_written == blocks_needed-1 && extra_bytes != 0){   for(int j = extra_bytes; j<BLOCK_SIZE; j++){    buf[j]=0;  }   }
+            write_block(block,buf);
+        }
+
+        blocks_needed -= s_blocks_written;
+        write_block(file_inode->single_ind,single_buf); 
+
+     printf("^^BN^^^%d^^^^^\n",blocks_needed);
+    
+    int si_blocks_needed =  (blocks_needed/256) + (!((blocks_needed%256)==0)); // calculates how many single blocks need to be written in current iteration of double indirect block loop
+
+    printf("^^SBN^^^%d^^^^^\n",si_blocks_needed);
+
+   
+    int blocks_to_write = 256*(blocks_needed>256)+((blocks_needed<=256)*blocks_needed%256);
+    printf("^^B2W^^^%d^^^^^\n",blocks_to_write);
+
+    int single_block;
+
+    for(int k = 0; k<si_blocks_needed;k++){
+
+            single_block = find_block();
+            close_block(single_block);
+            double_buf[2*k] = (single_block & 0xFF00) >> 8;
+            double_buf[(2*k)+1] = (single_block & 0x00FF);
+
+        read_block(single_block,single_buf);
+
+        blocks_to_write = 256*(blocks_needed>256)+((blocks_needed<=256)*blocks_needed%256);
+
+        for(int i = 0; i<blocks_to_write; i++){
+            block = find_block();
+            close_block(block);
+            single_buf[(2*i)] = (block & 0xFF00) >> 8;
+            single_buf[(2*i)+1] = (block & 0x00FF);
+
+            fseek(file,((s_blocks_written+di_blocks_written)+i)*BLOCK_SIZE,SEEK_SET);
+            fread(buf,BLOCK_SIZE,1,file);
+            if(i == blocks_to_write-1 && extra_bytes != 0){   for(int j = extra_bytes; j<BLOCK_SIZE; j++){    buf[j]=0;   }  }
+            write_block(block,buf);//blocks_needed -= 256;
+        }
+            if(blocks_needed>256){
+                blocks_needed -= 256;
+                s_blocks_written += 256;
+            } else {
+                for(int j = 2*blocks_to_write;j<BLOCK_SIZE;j++){  single_buf[j]=0;    }  
+            }
+            
+            write_block(single_block,single_buf);
+    }
+
+    for(int j = 2*si_blocks_needed;j<BLOCK_SIZE;j++){  double_buf[j]=0;    }  
+    write_block(file_inode->double_ind,double_buf);
+
+
+
+  }  
+
+    //printf("id: %d  ad: %d \n",file_inode_ID,file_inode_block);
+    
+    inode_into_buffer(file_inode,buf);
+    write_block(file_inode_block,buf);
+
+    
+
+   free(file_inode);
+   free(buf);
+   free(double_buf);
+   free(single_buf);
+   free(parent);
+   free(in);
+
+
+
+
+}
+
+void remove_file(BYTE_t* path){
+    inode_t* in = (inode_t*)calloc(1,sizeof(inode_t));
+    BYTE_t* buf = (BYTE_t*)calloc(BLOCK_SIZE,sizeof(BYTE_t));
+    dir_t*  parent = (dir_t*)calloc(1,sizeof(dir_t));
+
+    
+    BYTE_t new_path [MAX_FILE_PATH_LEN];
+
+    strncpy(new_path,path,MAX_FILE_PATH_LEN);
+
+    BYTE_t* tok;
+    const char* delim = "/"; 
+
+    tok = strtok(new_path,delim);
+
+    BYTE_t* tokens [5];  
+    int path_len = 0;
+    
+  
+  while( tok != NULL ) {
+
+      tokens[path_len] = tok; 
+      path_len++;
+
+      tok = strtok(NULL, delim);
+   }
+    int parent_dir_block = ROOT_DIR_BLOCK;
+
+    int parent_inode_ID = ROOT_INODE_ID;
+    int parent_inode_address = ROOT_INODE_BLOCK;
+    
+    read_block(parent_inode_address,buf);
+    buffer_into_inode(in,buf);
+    assert(in->flags==1);
+    parent_dir_block = in->blocks[0];
+ 
+    read_block(parent_dir_block,buf);
+    buffer_into_dir(parent,buf);
+
+    
+
+    for(int i = 1;i<path_len-1;i++){ // reads thorugh intermediate directories on path
+        
+        for(int j=2;j<MAX_DIR_ENTRIES;j++){ // first entry in directory is itself, parent is second so we can skip checking those(start at 2)
+            if(!(strncmp(tokens[i],parent->entries[j].filename,FILENAME_LEN))){
+                parent_inode_ID=parent->entries[j].inode_ID;
+                parent_inode_address = get_inode_address(parent_inode_ID);
+
+                   // printf("\n inode id: %d inode add: %d \n",parent_inode_ID, parent_inode_address);
+     
+                read_block(parent_inode_address,buf);
+                buffer_into_inode(in,buf);
+                assert(in->flags==1);
+                parent_dir_block = in->blocks[0]; 
+       
+                read_block(parent_dir_block,buf);
+                buffer_into_dir(parent,buf);
+
+                printf("\n FRFR CUH : %s\n",parent->entries[0].filename);
+
+                break;
+            }
+   
+        }
+            
+    }
+
+    int file_loc;
+
+    for(file_loc=2;file_loc<MAX_DIR_ENTRIES;file_loc++){
+        if(!strcmp(parent->entries[file_loc].filename,tokens[path_len-1]) ){    break;   };
+    }
+
+    assert(file_loc<MAX_DIR_ENTRIES);
+    
+    inode_t* file_inode = (inode_t*)calloc(1,sizeof(inode_t));
+
+    BYTE_t* sing_buf = (BYTE_t*)calloc(BLOCK_SIZE,sizeof(BYTE_t));
+    BYTE_t* doub_buf = (BYTE_t*)calloc(BLOCK_SIZE,sizeof(BYTE_t));
+    
+    int file_inode_ID = parent->entries[file_loc].inode_ID;
+    int file_inode_address = get_inode_address(file_inode_ID);
+    read_block(file_inode_address,buf);
+    buffer_into_inode(file_inode,buf);
+    
+    //printf("id: %d  ad: %d ",file_inode_ID,file_inode_address);
+
+    parent->entries[file_loc].inode_ID = 0;
+    strncpy(parent->entries[file_loc].filename,"",FILENAME_LEN);
+    dir_into_buffer(parent,buf);
+    write_block(parent_dir_block,buf);
+
+
+    //print_inode(file_inode);
+
+  
+
+    assert(file_inode->flags == 0);
+
+    int blocks_to_erase = (file_inode->size / BLOCK_SIZE) + (!((file_inode->size%BLOCK_SIZE)==0));
+    BYTE_t* wipe = (BYTE_t*)calloc(BLOCK_SIZE,sizeof(BYTE_t));
+
+    printf("\nFUCK ME: %d \n", blocks_to_erase);
+
+    if(blocks_to_erase<=10){
+
+        for(int i = 0; i<blocks_to_erase; i++){
+            write_block(file_inode->blocks[i],wipe);
+            open_block(file_inode->blocks[i]);
+            //printf("\n%d\n",file_inode->blocks[0]);
+        }
+
+    } else if (blocks_to_erase>10 && blocks_to_erase<=266){
+
+        int block;
+
+        int di_blocks_erased;
+        int s_blocks_erased;
+
+        for(di_blocks_erased = 0; di_blocks_erased<10; di_blocks_erased++){
+           
+            write_block(file_inode->blocks[di_blocks_erased],wipe);
+            open_block(file_inode->blocks[di_blocks_erased]);
+
+        }
+
+        blocks_to_erase -= di_blocks_erased;
+
+        printf("^%d^ ",file_inode->single_ind);
+
+        read_block(file_inode->single_ind,sing_buf);
+
+        //print_buf(sing_buf);
+
+        for(s_blocks_erased = 0; s_blocks_erased<blocks_to_erase; s_blocks_erased++){
+            block = ((sing_buf[2*s_blocks_erased] << 8) | (sing_buf[(2*s_blocks_erased)+1]) );
+
+            printf("^%d^ ",block);
+          
+            write_block(block,wipe); 
+            open_block(block);
+
+           
+        }
+        
+        for(int i = s_blocks_erased;i<BLOCK_SIZE;i++){  sing_buf[i] = 0;    }
+        write_block(file_inode->single_ind,wipe);
+        open_block(file_inode->single_ind);
+
+         
+
+    } else {
+
+        printf("\n ONE MORE PINT \n");
+
+        int s_blocks_erased;
+        int block;
+        int sing_block;
+
+        for(int i = 0; i<10; i++){
+            write_block(file_inode->blocks[i],wipe);
+            open_block(file_inode->blocks[i]);
+            //printf("\n%d\n",file_inode->blocks[0]);
+        }
+       
+         read_block(file_inode->single_ind,sing_buf);
+
+        for(s_blocks_erased = 0; s_blocks_erased<256; s_blocks_erased++){
+            block = ((sing_buf[2*s_blocks_erased] << 8) | (sing_buf[(2*s_blocks_erased)+1]) );
+
+            write_block(block,wipe); 
+            open_block(block);
+
+           
+        }
+        
+        write_block(file_inode->single_ind,wipe);
+        open_block(file_inode->single_ind);
+
+        read_block(file_inode->double_ind,doub_buf);
+
+        for(int k = 0; k<256; k++){
+        
+            sing_block = ((doub_buf[2*k] << 8) | (doub_buf[(2*k)+1]) );
+
+            if(sing_block == 0){    break;  }
+
+            read_block(sing_block,sing_buf);
+
+            for(s_blocks_erased = 0; s_blocks_erased<256; s_blocks_erased++){
+                block = ((sing_buf[2*s_blocks_erased] << 8) | (sing_buf[(2*s_blocks_erased)+1]) );
+
+                if(block==0){ break; }
+
+                write_block(block,wipe); 
+                open_block(block);
+
+            
+            }
+            
+            write_block(sing_block,wipe);
+            open_block(sing_block);
+
+            }
+
+            write_block(file_inode->double_ind,wipe);
+            open_block(file_inode->double_ind);
+        
+    }
+    //
+
+    write_block(file_inode_address,wipe);
+    open_block(file_inode_address);
+    open_inode(file_inode_ID);
+
+    printf("999|   %d  |999 ",find_block());
+
+}
+
+
+
+void read_file(BYTE_t* path, FILE* file){
+
+    inode_t* in = (inode_t*)calloc(1,sizeof(inode_t));
+    BYTE_t* buf = (BYTE_t*)calloc(BLOCK_SIZE,sizeof(BYTE_t));
+    dir_t*  parent = (dir_t*)calloc(1,sizeof(dir_t));
+
+    
+    BYTE_t new_path [MAX_FILE_PATH_LEN];
+
+    strncpy(new_path,path,MAX_FILE_PATH_LEN);
+
+    BYTE_t* tok;
+    const char* delim = "/"; 
+
+    tok = strtok(new_path,delim);
+
+    BYTE_t* tokens [5];  
+    int path_len = 0;
+    
+  
+  while( tok != NULL ) {
+
+      tokens[path_len] = tok; 
+      path_len++;
+
+      tok = strtok(NULL, delim);
+   }
+    int parent_dir_block = ROOT_DIR_BLOCK;
+
+    int parent_inode_ID = ROOT_INODE_ID;
+    int parent_inode_address = ROOT_INODE_BLOCK;
+    
+    read_block(parent_inode_address,buf);
+    buffer_into_inode(in,buf);
+    assert(in->flags==1);
+    parent_dir_block = in->blocks[0];
+ 
+    read_block(parent_dir_block,buf);
+    buffer_into_dir(parent,buf);
+
+
+
+    for(int i = 1;i<path_len-1;i++){ // reads thorugh intermediate directories on path
+        
+        for(int j=2;j<MAX_DIR_ENTRIES;j++){ // first entry in directory is itself, parent is second so we can skip checking those(start at 2)
+            if(!(strncmp(tokens[i],parent->entries[j].filename,FILENAME_LEN))){
+                parent_inode_ID=parent->entries[j].inode_ID;
+                parent_inode_address = get_inode_address(parent_inode_ID);
+
+
+
+                   // printf("\n inode id: %d inode add: %d \n",parent_inode_ID, parent_inode_address);
+
+     
+
+                read_block(parent_inode_address,buf);
+                buffer_into_inode(in,buf);
+                assert(in->flags==1);
+                parent_dir_block = in->blocks[0]; 
+       
+                read_block(parent_dir_block,buf);
+                buffer_into_dir(parent,buf);
+
+                //printf("\n Y ee t : %s\n",parent->entries[0].filename);
+
+                break;
+            }
+   
+        }
+            
+    }
+
+
+    //printf("\n%s\n",parent->entries[0].filename);
+
+
+    int file_loc;
+
+    for(file_loc=2;file_loc<MAX_DIR_ENTRIES;file_loc++){
+        if(!strcmp(parent->entries[file_loc].filename,tokens[path_len-1]) ){    break;   };
+    }
+
+    assert(file_loc<MAX_DIR_ENTRIES);
+    
+    inode_t* file_inode = (inode_t*)calloc(1,sizeof(inode_t));
+
+    BYTE_t* sing_buf = (BYTE_t*)calloc(BLOCK_SIZE,sizeof(BYTE_t));
+    BYTE_t* doub_buf = (BYTE_t*)calloc(BLOCK_SIZE,sizeof(BYTE_t));
+    
+    int file_inode_ID = parent->entries[file_loc].inode_ID;
+    int file_inode_address = get_inode_address(file_inode_ID);
+    read_block(file_inode_address,buf);
+    buffer_into_inode(file_inode,buf);
+    
+    //printf("id: %d  ad: %d ",file_inode_ID,file_inode_address)
+
+    //print_inode(file_inode);
+
+    assert(file_inode->flags == 0);
+
+    int full_blocks = file_inode->size/BLOCK_SIZE;
+    int extra_bytes = file_inode->size%BLOCK_SIZE;
+    int blocks_to_read = full_blocks+(extra_bytes!=0);
+
+    
+
+    if (blocks_to_read<=10) {
+       
+        int i;
+
+        for(i = 0; i<full_blocks; i++){
+            
+            read_block(file_inode->blocks[i],buf);
+            fwrite(buf,BLOCK_SIZE,1,file);
+
+        }
+            
+            blocks_to_read-=full_blocks;
+
+            if(blocks_to_read!=0){   
+                read_block(file_inode->blocks[i],buf);
+                fwrite(buf,extra_bytes,1,file); 
+                }
+
+
+    } else if(blocks_to_read>10 && blocks_to_read<=266){
+       
+       int block;
+
+        for(int i = 0; i<10; i++){
+            
+            read_block(file_inode->blocks[i],buf);
+            fwrite(buf,BLOCK_SIZE,1,file);
+
+        }
+
+        full_blocks-=10;
+        blocks_to_read -= 10;
+
+        read_block(file_inode->single_ind,sing_buf);
+
+        int j;
+
+        for(j = 0; j<full_blocks; j++){
+            block = ((sing_buf[2*j] << 8) | (sing_buf[(2*j)+1]) );
+      
+            read_block(block,buf);
+            fwrite(buf,BLOCK_SIZE,1,file);
+
+        }
+
+
+         blocks_to_read-=full_blocks;
+
+            if(blocks_to_read!=0){   
+                block = ((sing_buf[2*j] << 8) | (sing_buf[(2*j)+1]) );
+                read_block(block,buf);
+                fwrite(buf,extra_bytes,1,file); 
+                }
+
+
+    }   else if (blocks_to_read > 266){ // if need more than 10 direct block and the 256 indirect
+
+
+        int block;
+        int sing_block;
+
+        for(int i = 0; i<10; i++){
+            
+            read_block(file_inode->blocks[i],buf);
+            fwrite(buf,BLOCK_SIZE,1,file);
+
+        }
+
+        full_blocks-=10;
+        blocks_to_read -= 10;
+
+        read_block(file_inode->single_ind,sing_buf);
+
+        
+
+        for(int j = 0; j<256; j++){
+            block = ((sing_buf[2*j] << 8) | (sing_buf[(2*j)+1]) );
+      
+            read_block(block,buf);
+            fwrite(buf,BLOCK_SIZE,1,file);
+
+        }
+
+
+         blocks_to_read-=256;
+         full_blocks-=256;
+
+         read_block(file_inode->double_ind,doub_buf);
+
+       //int j;
+       int k;
+       int next;
+        int doubl =  (blocks_to_read/256) + (!((blocks_to_read%256)==0)); // calculates how many single blocks need to be written in current iteration of double indirect block loop
+        int single_read;
+
+        for(k = 0; k<doubl; k++){
+            sing_block = ((doub_buf[2*k] << 8) | (doub_buf[(2*k)+1]) );
+            
+            if(sing_block == 0){    break;  }
+            
+            read_block(sing_block,sing_buf);
+
+            single_read = 256*(blocks_to_read>256) + blocks_to_read*(blocks_to_read<=256);
+
+            for(int j = 0; j<single_read; j++){
+                block = ((sing_buf[2*j] << 8) | (sing_buf[(2*j)+1]) );
+
+
+                read_block(block,buf);
+
+                if(single_read<256 && j==single_read-1){ fwrite(buf,extra_bytes,1,file); break; }
+
+                fwrite(buf,BLOCK_SIZE,1,file);
+                printf("%d\n",blocks_to_read);
+
+                
+
+            }
+/*
+             if(blocks_to_read == 1 && extra_bytes!=0){
+                         int index = j%256;
+
+                        if(index==0){read_block(sing_block,sing_buf);}
+
+                         block = ((sing_buf[2*index] << 8) | (sing_buf[(2*index)+1]) );
+                         read_block(block,buf);
+                         fwrite(buf,extra_bytes,1,file);
+                         break;
+                              // THIS ALMOST FUCKING WORKS
+                }*/
+              
+
+            blocks_to_read-=single_read;
+            //full_blocks -= single_read;
+
+
+        }  
+        
+
+       
+  }  
+
+    //printf("id: %d  ad: %d \n",file_inode_ID,file_inode_block);
+    
+    //inode_into_buffer(file_inode,buf);
+   // write_block(file_inode_block,buf);
+
+    
+/*
+   free(file_inode);
+   free(buf);
+   free(double_buf);
+   free(single_buf);
+   free(parent);
+   free(in);
+*/
+}
