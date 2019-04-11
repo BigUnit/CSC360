@@ -3,7 +3,7 @@
 int read_block(int block, BYTE_t* buf){
    if(block > NUM_BLOCKS || block < 0){return -1;}
    
-    FILE* disk = fopen(VDISK,"r");
+    FILE* disk = fopen(VDISK,"rb");
     assert(disk);
 
     fseek(disk,block*BLOCK_SIZE,SEEK_SET);
@@ -17,7 +17,7 @@ int read_block(int block, BYTE_t* buf){
 int write_block(int block, BYTE_t* data){
    if(block > NUM_BLOCKS || block < 0){return -1;}
 
-    FILE* disk = fopen(VDISK,"r+");
+    FILE* disk = fopen(VDISK,"rb+");
 
     assert(disk);
 
@@ -30,7 +30,7 @@ int write_block(int block, BYTE_t* data){
 }
 
 void create_disk(void){ 
-    FILE* disk = fopen(VDISK,"w+");
+    FILE* disk = fopen(VDISK,"wb+");
     assert(disk);
     assert(!fclose(disk));
     } // creates disk 

@@ -62,6 +62,7 @@ void write_file(BYTE_t* path, FILE* file);
 void read_file(BYTE_t* path, FILE* file);
 void remove_file(BYTE_t* path);
 int block_empty(BYTE_t* buf);
+int inode_empty(BYTE_t* buf);
 void file_check(void);
 
 #endif
